@@ -171,9 +171,6 @@
     </div>
 
     <script>
-        const API_KEY = 'dc148c3c07a3236f9b83c0f5a34e8e5dd24ceaa55e1d21f547f0ae6443c08f1a';
-        const API_URL = 'https://apis.data.go.kr/1613000/ExpBusInfo/searchExpBusInfo';
-
         async function searchBuses() {
             const departure = document.getElementById('departure').value.trim();
             const arrival = document.getElementById('arrival').value.trim();
@@ -187,36 +184,47 @@
             resultsDiv.innerHTML = '<div class="loading">검색 중...</div>';
 
             try {
-                const url = new URL(API_URL);
-                url.searchParams.append('serviceKey', API_KEY);
-                url.searchParams.append('startStn', departure);
-                url.searchParams.append('endStn', arrival);
-                url.searchParams.append('_type', 'json');
+                const response = await fetch('/.netlify/functions/search-buses', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        departure: departure,
+                        arrival: arrival
+                    })
+                });
 
-                const response = await fetch(url.toString());
                 const data = await response.json();
 
-                if (data.response && data.response.body && data.response.body.items && data.response.body.items.length > 0) {
-                    let html = '';
-                    data.response.body.items.forEach(item => {
-                        html += `
-                            <div class="bus-item">
-                                <div class="bus-header">
-                                    <span class="bus-route">${item.routeName || '노선 정보'}</span>
-                                    <span class="bus-time">${item.departureTime || '-'}</span>
-                                </div>
-                                <div class="bus-info">
-                                    <div>터미널: ${item.departureTerminal || '-'}</div>
-                                    <div>요금: ${item.fare || '-'}원</div>
-                                    <div>소요시간: ${item.travelTime || '-'}</div>
-                                </div>
-                            </div>
-                        `;
-                    });
-                    resultsDiv.innerHTML = html;
-                } else {
-                    resultsDiv.innerHTML = '<div class="no-results">검색 결과가 없습니다.</div>';
+                if (data.error) {
+                    resultsDiv.innerHTML = `<div class="error">${data.error}</div>`;
+                    return;
                 }
+
+                if (!data.buses || data.buses.length === 0) {
+                    resultsDiv.innerHTML = '<div class="no-results">검색 결과가 없습니다.</div>';
+                    return;
+                }
+
+                let html = '';
+                data.buses.forEach(bus => {
+                    html += `
+                        <div class="bus-item">
+                            <div class="bus-header">
+                                <span class="bus-route">${bus.routeName || '노선 정보'}</span>
+                                <span class="bus-time">${bus.departureTime || '-'}</span>
+                            </div>
+                            <div class="bus-info">
+                                <div>터미널: ${bus.departureTerminal || '-'}</div>
+                                <div>요금: ${bus.fare || '-'}원</div>
+                                <div>소요시간: ${bus.travelTime || '-'}</div>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                resultsDiv.innerHTML = html;
             } catch (error) {
                 resultsDiv.innerHTML = `<div class="error">오류 발생: ${error.message}</div>`;
             }
