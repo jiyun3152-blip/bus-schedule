@@ -1,17 +1,26 @@
-export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+exports.handler = async (event) => {
+  if (event.httpMethod !== 'POST') {
+    return {
+      statusCode: 405,
+      body: JSON.stringify({ error: 'Method not allowed' })
+    };
   }
 
   try {
-    const { searchKeyword, apiKey } = req.body;
+    const { searchKeyword, apiKey } = JSON.parse(event.body);
 
     if (!searchKeyword) {
-      return res.status(400).json({ error: '검색어가 필요합니다' });
+      return {
+        statusCode: 400,
+        body: JSON.stringify({ error: '검색어가 필요합니다' })
+      };
     }
 
     if (!apiKey) {
-      return res.status(400).json({ error: 'API 키가 설정되지 않았습니다' });
+      return {
+        statusCode: 400,
+        body: JSON.stringify({ error: 'API 키가 설정되지 않았습니다' })
+      };
     }
 
     const url = new URL('https://apis.data.go.kr/1613000/ExpBusInfo/getExpBusTerminalList');
@@ -21,8 +30,24 @@ export default async function handler(req, res) {
     url.searchParams.append('numOfRows', '50');
     url.searchParams.append('_type', 'json');
 
+    console.log('요청 URL:', url.toString());
+
     const response = await fetch(url.toString());
-    const data = await response.json();
+    const text = await response.text();
+
+    console.log('응답 상태:', response.status);
+    console.log('응답 텍스트:', text);
+
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch (e) {
+      console.error('JSON 파싱 오류:', e);
+      return {
+        statusCode: 500,
+        body: JSON.stringify({ error: 'API 응답이 JSON이 아닙니다', response: text.substring(0, 200) })
+      };
+    }
 
     if (data.response?.body?.items) {
       const terminals = data.response.body.items.map(item => ({
@@ -31,12 +56,21 @@ export default async function handler(req, res) {
         cityCode: item.cityCode || ''
       }));
       
-      return res.status(200).json({ terminals });
+      return {
+        statusCode: 200,
+        body: JSON.stringify({ terminals })
+      };
     }
 
-    return res.status(200).json({ terminals: [] });
+    return {
+      statusCode: 200,
+      body: JSON.stringify({ terminals: [] })
+    };
   } catch (error) {
     console.error('터미널 조회 오류:', error.message);
-    return res.status(500).json({ error: '서버 오류: ' + error.message });
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ error: '서버 오류: ' + error.message })
+    };
   }
-}
+};
