@@ -26,7 +26,7 @@
             padding: 40px;
             text-align: center;
             width: 90%;
-            max-width: 600px;
+            max-width: 700px;
             border: 2px solid #4C4C4C;
             border-radius: 20px;
             background-color: white;
@@ -45,12 +45,18 @@
         
         .input-group {
             display: flex;
-            gap: 10px;
+            flex-direction: column;
+            gap: 15px;
             margin-bottom: 15px;
+        }
+        
+        .input-row {
+            display: flex;
+            gap: 10px;
             flex-wrap: wrap;
         }
         
-        input {
+        input, select {
             flex: 1;
             min-width: 150px;
             padding: 12px;
@@ -66,6 +72,39 @@
             color: #999;
         }
         
+        .autocomplete-list {
+            position: absolute;
+            background: white;
+            border: 2px solid #4C4C4C;
+            border-radius: 8px;
+            max-height: 150px;
+            overflow-y: auto;
+            width: 200px;
+            display: none;
+            z-index: 10;
+        }
+        
+        .autocomplete-list.active {
+            display: block;
+        }
+        
+        .autocomplete-item {
+            padding: 10px;
+            cursor: pointer;
+            text-align: left;
+            color: #4C4C4C;
+        }
+        
+        .autocomplete-item:hover {
+            background-color: #f0f0f0;
+        }
+        
+        .input-wrapper {
+            position: relative;
+            flex: 1;
+            min-width: 150px;
+        }
+        
         button {
             padding: 12px 30px;
             font-size: 16px;
@@ -77,6 +116,7 @@
             font-weight: bold;
             font-family: 'gryun', sans-serif;
             transition: all 0.3s ease;
+            width: 100%;
         }
         
         button:hover {
@@ -86,7 +126,7 @@
         
         .results {
             margin-top: 30px;
-            max-height: 400px;
+            max-height: 500px;
             overflow-y: auto;
         }
         
@@ -98,29 +138,18 @@
             text-align: left;
         }
         
-        .bus-header {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 10px;
-            font-weight: bold;
-            color: #4C4C4C;
-        }
-        
-        .bus-route {
-            font-size: 18px;
-            color: #4C4C4C;
-        }
-        
         .bus-time {
             font-size: 20px;
             color: #2563eb;
             font-weight: bold;
+            margin-bottom: 10px;
         }
         
         .bus-info {
             font-size: 14px;
             color: #666;
             margin-top: 8px;
+            line-height: 1.6;
         }
         
         .loading {
@@ -153,15 +182,29 @@
         
         <div class="search-section">
             <div class="input-group">
+                <div class="input-row">
+                    <div class="input-wrapper">
+                        <input 
+                            type="text" 
+                            id="departure" 
+                            placeholder="출발지 (예: 서울, 부산)" 
+                            autocomplete="off"
+                        >
+                        <div id="departure-list" class="autocomplete-list"></div>
+                    </div>
+                    <div class="input-wrapper">
+                        <input 
+                            type="text" 
+                            id="arrival" 
+                            placeholder="도착지 (예: 부산, 사상)" 
+                            autocomplete="off"
+                        >
+                        <div id="arrival-list" class="autocomplete-list"></div>
+                    </div>
+                </div>
                 <input 
-                    type="text" 
-                    id="departure" 
-                    placeholder="출발지 (예: 서울)" 
-                >
-                <input 
-                    type="text" 
-                    id="arrival" 
-                    placeholder="도착지 (예: 부산)" 
+                    type="date" 
+                    id="travel-date"
                 >
             </div>
             <button onclick="searchBuses()">검색</button>
@@ -171,27 +214,98 @@
     </div>
 
     <script>
+        const API_KEY = 'dc148c3c07a3236f9b83c0f5a34e8e5dd24ceaa55e1d21f547f0ae6443c08f1a';
+        let allTerminals = [];
+        let departureTerminals = [];
+        let arrivalTerminals = [];
+
+        // 날짜 기본값 설정 (오늘)
+        document.getElementById('travel-date').valueAsDate = new Date();
+
+        // 터미널 목록 초기 로드
+        async function loadTerminals() {
+            try {
+                const response = await fetch('/.netlify/functions/get-terminals', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ apiKey: API_KEY })
+                });
+                
+                const data = await response.json();
+                if (data.terminals) {
+                    allTerminals = data.terminals;
+                }
+            } catch (error) {
+                console.log('터미널 로드 실패:', error);
+            }
+        }
+
+        // 자동완성 필터링
+        function filterTerminals(input, isList = 'departure') {
+            const filtered = allTerminals.filter(t => 
+                t.terminalName.includes(input) || t.terminalId.includes(input)
+            );
+            
+            const listId = isList === 'departure' ? 'departure-list' : 'arrival-list';
+            const listElement = document.getElementById(listId);
+            
+            if (input.length > 0 && filtered.length > 0) {
+                listElement.innerHTML = filtered.slice(0, 8).map(t => 
+                    `<div class="autocomplete-item" onclick="selectTerminal('${isList}', '${t.terminalId}', '${t.terminalName}')">${t.terminalName} (${t.terminalId})</div>`
+                ).join('');
+                listElement.classList.add('active');
+            } else {
+                listElement.classList.remove('active');
+            }
+        }
+
+        // 터미널 선택
+        function selectTerminal(type, terminalId, terminalName) {
+            if (type === 'departure') {
+                document.getElementById('departure').value = terminalName;
+                document.getElementById('departure').dataset.terminalId = terminalId;
+                document.getElementById('departure-list').classList.remove('active');
+            } else {
+                document.getElementById('arrival').value = terminalName;
+                document.getElementById('arrival').dataset.terminalId = terminalId;
+                document.getElementById('arrival-list').classList.remove('active');
+            }
+        }
+
+        // 입력 이벤트 리스너
+        document.getElementById('departure').addEventListener('input', (e) => {
+            filterTerminals(e.target.value, 'departure');
+        });
+
+        document.getElementById('arrival').addEventListener('input', (e) => {
+            filterTerminals(e.target.value, 'arrival');
+        });
+
+        // 검색
         async function searchBuses() {
-            const departure = document.getElementById('departure').value.trim();
-            const arrival = document.getElementById('arrival').value.trim();
+            const departureInput = document.getElementById('departure');
+            const arrivalInput = document.getElementById('arrival');
+            const dateInput = document.getElementById('travel-date');
             const resultsDiv = document.getElementById('results');
 
-            if (!departure || !arrival) {
-                resultsDiv.innerHTML = '<div class="error">출발지와 도착지를 입력해주세요.</div>';
+            if (!departureInput.dataset.terminalId || !arrivalInput.dataset.terminalId || !dateInput.value) {
+                resultsDiv.innerHTML = '<div class="error">출발지, 도착지, 날짜를 모두 선택해주세요.</div>';
                 return;
             }
 
             resultsDiv.innerHTML = '<div class="loading">검색 중...</div>';
 
             try {
+                const dateStr = dateInput.value.replace(/-/g, '');
+                
                 const response = await fetch('/.netlify/functions/search-buses', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        departure: departure,
-                        arrival: arrival
+                        depTerminalId: departureInput.dataset.terminalId,
+                        arrTerminalId: arrivalInput.dataset.terminalId,
+                        depPlanTime: dateStr,
+                        apiKey: API_KEY
                     })
                 });
 
@@ -211,14 +325,14 @@
                 data.buses.forEach(bus => {
                     html += `
                         <div class="bus-item">
-                            <div class="bus-header">
-                                <span class="bus-route">${bus.routeName || '노선 정보'}</span>
-                                <span class="bus-time">${bus.departureTime || '-'}</span>
+                            <div class="bus-time">
+                                ${bus.depPlandTime || '-'} → ${bus.arrPlandTime || '-'}
                             </div>
                             <div class="bus-info">
-                                <div>터미널: ${bus.departureTerminal || '-'}</div>
-                                <div>요금: ${bus.fare || '-'}원</div>
-                                <div>소요시간: ${bus.travelTime || '-'}</div>
+                                <div>요금: ${bus.charge || '-'}원</div>
+                                <div>등급: ${bus.gradeNm || '-'}</div>
+                                <div>출발: ${bus.depPlaceName || '-'}</div>
+                                <div>도착: ${bus.arrPlaceName || '-'}</div>
                             </div>
                         </div>
                     `;
@@ -230,9 +344,8 @@
             }
         }
 
-        document.getElementById('arrival').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') searchBuses();
-        });
+        // 초기 로드
+        loadTerminals();
     </script>
 </body>
 </html>
