@@ -289,7 +289,7 @@
                 const terminals = await searchTerminals(keyword);
                 if (terminals.length > 0) {
                     listDiv.innerHTML = terminals.map(t => 
-                        `<div class="autocomplete-item" onclick="selectDeparture('${t.terminalId}', '${t.terminalName}')">${t.terminalName}</div>`
+                        `<div class="autocomplete-item" onclick="selectDeparture('${t.terminalId}', '${t.terminalNm}')">${t.terminalNm}</div>`
                     ).join('');
                     listDiv.style.display = 'block';
                 } else {
@@ -309,7 +309,7 @@
                 const terminals = await searchTerminals(keyword);
                 if (terminals.length > 0) {
                     listDiv.innerHTML = terminals.map(t => 
-                        `<div class="autocomplete-item" onclick="selectArrival('${t.terminalId}', '${t.terminalName}')">${t.terminalName}</div>`
+                        `<div class="autocomplete-item" onclick="selectArrival('${t.terminalId}', '${t.terminalNm}')">${t.terminalNm}</div>`
                     ).join('');
                     listDiv.style.display = 'block';
                 } else {
