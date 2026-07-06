@@ -1,4 +1,6 @@
 exports.handler = async (event) => {
+  const API_KEY = 'dc148c3c07a3236f9b83c0f5a34e8e5dd24ceaa55e1d21f547f0ae6443c08f1a';
+  
   if (event.httpMethod !== 'POST') {
     return {
       statusCode: 405,
@@ -7,7 +9,7 @@ exports.handler = async (event) => {
   }
 
   try {
-    const { searchKeyword, apiKey } = JSON.parse(event.body);
+    const { searchKeyword } = JSON.parse(event.body);
 
     if (!searchKeyword) {
       return {
@@ -16,38 +18,10 @@ exports.handler = async (event) => {
       };
     }
 
-    if (!apiKey) {
-      return {
-        statusCode: 400,
-        body: JSON.stringify({ error: 'API 키가 설정되지 않았습니다' })
-      };
-    }
+    const url = `https://apis.data.go.kr/1613000/ExpBusInfo/getExpBusTerminalList?serviceKey=${API_KEY}&searchKeyword=${encodeURIComponent(searchKeyword)}&pageNo=1&numOfRows=50&_type=json`;
 
-    const url = new URL('https://apis.data.go.kr/1613000/ExpBusInfo/getExpBusTerminalList');
-    url.searchParams.append('serviceKey', apiKey);
-    url.searchParams.append('searchKeyword', searchKeyword);
-    url.searchParams.append('pageNo', '1');
-    url.searchParams.append('numOfRows', '50');
-    url.searchParams.append('_type', 'json');
-
-    console.log('요청 URL:', url.toString());
-
-    const response = await fetch(url.toString());
-    const text = await response.text();
-
-    console.log('응답 상태:', response.status);
-    console.log('응답 텍스트:', text);
-
-    let data;
-    try {
-      data = JSON.parse(text);
-    } catch (e) {
-      console.error('JSON 파싱 오류:', e);
-      return {
-        statusCode: 500,
-        body: JSON.stringify({ error: 'API 응답이 JSON이 아닙니다', response: text.substring(0, 200) })
-      };
-    }
+    const response = await fetch(url);
+    const data = await response.json();
 
     if (data.response?.body?.items) {
       const terminals = data.response.body.items.map(item => ({
@@ -70,7 +44,7 @@ exports.handler = async (event) => {
     console.error('터미널 조회 오류:', error.message);
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: '서버 오류: ' + error.message })
+      body: JSON.stringify({ error: error.message })
     };
   }
 };
