@@ -18,7 +18,7 @@ exports.handler = async (event) => {
       };
     }
 
-    const url = `https://apis.data.go.kr/1613000/ExpBusInfo/getExpBusTerminalList?serviceKey=${API_KEY}&searchKeyword=${encodeURIComponent(searchKeyword)}&pageNo=1&numOfRows=50&_type=json`;
+    const url = `https://apis.data.go.kr/1613000/ExpBusInfo/getExpBusTerminalList?serviceKey=${API_KEY}&terminalNm=${encodeURIComponent(searchKeyword)}&numOfRows=50&pageNo=1&_type=json`;
 
     const response = await fetch(url);
     const data = await response.json();
@@ -26,8 +26,7 @@ exports.handler = async (event) => {
     if (data.response?.body?.items) {
       const terminals = data.response.body.items.map(item => ({
         terminalId: item.terminalId || '',
-        terminalName: item.terminalName || '',
-        cityCode: item.cityCode || ''
+        terminalNm: item.terminalNm || ''
       }));
       
       return {
@@ -41,7 +40,7 @@ exports.handler = async (event) => {
       body: JSON.stringify({ terminals: [] })
     };
   } catch (error) {
-    console.error('터미널 조회 오류:', error.message);
+    console.error('터미널 조회 오류:', error);
     return {
       statusCode: 500,
       body: JSON.stringify({ error: error.message })
