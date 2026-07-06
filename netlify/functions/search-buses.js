@@ -4,23 +4,19 @@ exports.handler = async (event) => {
     }
 
     try {
-        const { departure, arrival } = JSON.parse(event.body);
-        const API_KEY = process.env.NAVER_API_KEY;
+        const { depTerminalId, arrTerminalId, depPlanTime, apiKey } = JSON.parse(event.body);
 
-        if (!API_KEY) {
+        if (!depTerminalId || !arrTerminalId || !depPlanTime || !apiKey) {
             return {
-                statusCode: 500,
-                body: JSON.stringify({ error: 'API 키가 설정되지 않았습니다' })
+                statusCode: 400,
+                body: JSON.stringify({ error: '필수 정보가 누락되었습니다' })
             };
         }
 
-        const url = `https://apis.data.go.kr/1613000/ExpBusInfo/searchExpBusInfo?serviceKey=${API_KEY}&startStn=${departure}&endStn=${arrival}&_type=json`;
+        const url = `https://apis.data.go.kr/1613000/ExpBusInfo/searchExpBusInfo?serviceKey=${apiKey}&depTerminalId=${depTerminalId}&arrTerminalId=${arrTerminalId}&depPlanTime=${depPlanTime}&pageNo=1&numOfRows=100&_type=json`;
 
         const response = await fetch(url);
         const text = await response.text();
-
-        // 디버깅: 응답 내용 확인
-        console.log('API Response:', text);
 
         let data;
         try {
@@ -28,17 +24,18 @@ exports.handler = async (event) => {
         } catch (e) {
             return {
                 statusCode: 500,
-                body: JSON.stringify({ error: `응답 파싱 실패: ${text.substring(0, 200)}` })
+                body: JSON.stringify({ error: `응답 파싱 실패: ${text.substring(0, 100)}` })
             };
         }
 
         if (data.response && data.response.body && data.response.body.items && Array.isArray(data.response.body.items)) {
             const buses = data.response.body.items.map(item => ({
-                routeName: item.routeName || '노선 정보',
-                departureTime: item.departureTime || '-',
-                departureTerminal: item.departureTerminal || '-',
-                fare: item.fare || '-',
-                travelTime: item.travelTime || '-'
+                depPlandTime: item.depPlandTime || '-',
+                arrPlandTime: item.arrPlandTime || '-',
+                depPlaceName: item.depPlaceName || '-',
+                arrPlaceName: item.arrPlaceName || '-',
+                charge: item.charge || '-',
+                gradeNm: item.gradeNm || '-'
             }));
 
             return {
@@ -48,7 +45,7 @@ exports.handler = async (event) => {
         } else {
             return {
                 statusCode: 200,
-                body: JSON.stringify({ buses: [], rawResponse: data })
+                body: JSON.stringify({ buses: [] })
             };
         }
     } catch (error) {
